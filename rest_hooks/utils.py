@@ -27,38 +27,27 @@ def get_module(path):
     return func
 
 
-def find_and_fire_hook(event_name, instance, user_override=None):
+def find_and_fire_hook(event_name, instance, user_override=False):
     """
     Look up Hooks that apply
     """
     from django.db.models import Q
-    from django.contrib.auth.models import User
     from rest_hooks.models import Hook, HOOK_EVENTS
-
-    if user_override:
-        user = user_override
-    elif hasattr(instance, 'user'):
-        user = instance.user
-    elif isinstance(instance, User):
-        user = instance
-    else:
-        user = None
 
     if not event_name in HOOK_EVENTS.keys():
         raise Exception(
             '"{}" does not exist in `settings.HOOK_EVENTS`.'.format(event_name)
         )
 
-    hooks = Hook.objects.filter(
-        Q(global_hook=True) | Q(user=user),
-        event=event_name
-    )
+    # fetch all registered hooks for this event
+    hooks = Hook.objects.filter(event=event_name)
 
+    # iterate over all registered hooks & deliver the event to each one
     for hook in hooks:
         hook.deliver_hook(instance)
 
 
-def distill_model_event(instance, model, action, user_override=None):
+def distill_model_event(instance, model, action, user_override=False):
     """
     Take created, updated and deleted actions for built-in 
     app/model mappings, convert to the defined event.name

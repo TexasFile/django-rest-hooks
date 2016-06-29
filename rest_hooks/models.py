@@ -29,8 +29,6 @@ if getattr(settings, 'HOOK_THREADING', True):
 else:
     client = requests
 
-AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
-
 
 class Hook(models.Model):
     """
@@ -39,22 +37,17 @@ class Hook(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 
-    user = models.ForeignKey(AUTH_USER_MODEL, related_name='hooks')
     event = models.CharField(
         'Event',
         max_length=64,
         db_index=True,
         choices=[(e, e) for e in sorted(HOOK_EVENTS.keys())]
     )
+
     target = models.URLField('Target URL', max_length=255)
-    global_hook = models.BooleanField(
-        default=False,
-        verbose_name='Global hook',
-        help_text='Fire the hook, regardless of user owning the object.'
-    )
 
     class Meta:
-        unique_together = (("user", "event", "target", "global_hook"),)
+        unique_together = (("event", "target"),)
 
     def clean(self):
         """ Validation for events. """
@@ -78,9 +71,11 @@ class Hook(models.Model):
         """
         if getattr(instance, 'serialize_hook', None) and callable(instance.serialize_hook):
             return instance.serialize_hook(hook=self)
+
         if getattr(settings, 'HOOK_SERIALIZER', None):
             serializer = get_module(settings.HOOK_SERIALIZER)
             return serializer(instance, hook=self)
+
         # if no user defined serializers, fallback to the django builtin!
         data = serializers.serialize('python', [instance])[0]
         for k, v in data.items():
@@ -102,6 +97,7 @@ class Hook(models.Model):
         By default it serializes to JSON and POSTs.
         """
         payload = payload_override or self.serialize_hook(instance)
+
         if getattr(settings, 'HOOK_DELIVERER', None):
             deliverer = get_module(settings.HOOK_DELIVERER)
             deliverer(self.target, payload, instance=instance, hook=self)
@@ -113,6 +109,7 @@ class Hook(models.Model):
             )
 
         signals.hook_sent_event.send_robust(sender=self.__class__, payload=payload, instance=instance, hook=self)
+
         return None
 
     def __unicode__(self):
@@ -169,7 +166,7 @@ def custom_action(sender, action,
     """
     opts = get_opts(instance)
     model = '.'.join([opts.app_label, opts.object_name])
-    distill_model_event(instance, model, action, user_override=user)
+    distill_model_event(instance, model, action, user_override=False)
 
 
 @receiver(raw_hook_event, dispatch_uid='raw-custom-hook')
@@ -182,7 +179,7 @@ def raw_custom_event(sender, event_name,
     """
     Give a full payload
     """
-    hooks = Hook.objects.filter(user=user, event=event_name)
+    hooks = Hook.objects.filter(event=event_name)
 
     for hook in hooks:
         new_payload = payload

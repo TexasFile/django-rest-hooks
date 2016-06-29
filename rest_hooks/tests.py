@@ -12,7 +12,6 @@ except ImportError:
     import json
 
 from django.conf import settings
-from django.contrib.auth.models import User
 try:
     from django.contrib.comments.models import Comment
     comments_app_label = 'comments'
@@ -44,7 +43,6 @@ class RESTHooksTest(TestCase):
         self.HOOK_DELIVERER = getattr(settings, 'HOOK_DELIVERER', None)
         self.client = requests # force non-async for test cases
 
-        self.user = User.objects.create_user('bob', 'bob@example.com', 'password')
         self.site, created = Site.objects.get_or_create(domain='example.com', name='example.com')
 
         models.HOOK_EVENTS = {
@@ -65,7 +63,6 @@ class RESTHooksTest(TestCase):
 
     def make_hook(self, event, target):
         return Hook.objects.create(
-            user=self.user,
             event=event,
             target=target
         )
@@ -81,8 +78,6 @@ class RESTHooksTest(TestCase):
     def test_no_hook(self):
         comment = Comment.objects.create(
             site=self.site,
-            content_object=self.user,
-            user=self.user,
             comment='Hello world!'
         )
 
@@ -95,8 +90,6 @@ class RESTHooksTest(TestCase):
 
         comment = Comment.objects.create(
             site=self.site,
-            content_object=self.user,
-            user=self.user,
             comment='Hello world!'
         )
         # time.sleep(1) # should change a setting to turn off async
@@ -186,8 +179,6 @@ class RESTHooksTest(TestCase):
 
         comment = Comment.objects.create(
             site=self.site,
-            content_object=self.user,
-            user=self.user,
             comment='Hello world!'
         )
 
@@ -218,7 +209,6 @@ class RESTHooksTest(TestCase):
             payload={
                 'hello': 'world!'
             },
-            user=self.user
         )
         # time.sleep(1) # should change a setting to turn off async
 
@@ -276,7 +266,6 @@ class RESTHooksTest(TestCase):
     def test_valid_form(self):
 
         form_data = {
-            'user': self.user.id,
             'target': "http://example.com",
             'event': HookForm.ADMIN_EVENTS[0][0]
         }
@@ -285,7 +274,6 @@ class RESTHooksTest(TestCase):
 
     def test_form_save(self):
         form_data = {
-            'user': self.user.id,
             'target': "http://example.com",
             'event': HookForm.ADMIN_EVENTS[0][0]
         }
