@@ -40,9 +40,21 @@ class Hook(models.Model):
     updated = models.DateTimeField(auto_now=True)
 
     user = models.ForeignKey(AUTH_USER_MODEL, related_name='hooks')
-    event = models.CharField('Event', max_length=64,
-                                      db_index=True)
+    event = models.CharField(
+        'Event',
+        max_length=64,
+        db_index=True,
+        choices=[(e, e) for e in sorted(HOOK_EVENTS.keys())]
+    )
     target = models.URLField('Target URL', max_length=255)
+    global_hook = models.BooleanField(
+        default=False,
+        verbose_name='Global hook',
+        help_text='Fire the hook, regardless of user owning the object.'
+    )
+
+    class Meta:
+        unique_together = (("user", "event", "target", "global_hook"),)
 
     def clean(self):
         """ Validation for events. """
